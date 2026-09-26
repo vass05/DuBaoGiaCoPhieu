@@ -4,17 +4,17 @@
 
 ---
 
-## 🌐 Trải Nghiệm Ứng Dụng Trực Tuyến (Live Demo)
+## Trải Nghiệm Ứng Dụng Trực Tuyến (Live Demo)
 
 Ứng dụng đã được triển khai trực tiếp trên đám mây Render.com, có thể truy cập 24/7 từ bất kỳ thiết bị nào (máy tính, điện thoại, máy tính bảng):
 
-👉 **Link Demo Trực Tuyến**: **[https://dubaogiacophieu.onrender.com/](https://dubaogiacophieu.onrender.com/)**
+- **Link Demo Trực Tuyến**: **[https://dubaogiacophieu.onrender.com/](https://dubaogiacophieu.onrender.com/)**
 
 *(Lưu ý: Nếu sau một khoảng thời gian không có người truy cập, máy chủ miễn phí có thể cần khoảng 30 - 45 giây để khởi động lại ở lần mở đầu tiên).*
 
 ---
 
-## 🏗️ Cấu Trúc Dự Án Theo Mô Hình MVC
+## Cấu Trúc Dự Án Theo Mô Hình MVC
 
 ```
 RNN/
@@ -57,7 +57,7 @@ RNN/
 
 ---
 
-## ✨ Các Chức Năng Chính
+## Các Chức Năng Chính
 
 ### 1. Dự Báo Thị Trường (Bảng Điều Khiển Chính)
 - **Lựa chọn mã cổ phiếu**: Hỗ trợ xem các mã cổ phiếu phổ biến (`AAPL`, `MSFT`, `GOOGL`, `AMZN`, `FB`, `NVDA`, `IBM`, `INTC`, `JPM`, `AAL`,...).
@@ -73,7 +73,7 @@ RNN/
 
 ---
 
-## 🎨 Thiết Kế & Trải Nghiệm Giao Diện (UI/UX)
+## Thiết Kế & Trải Nghiệm Giao Diện (UI/UX)
 
 - **Phong cách tối giản, tinh tế (Clean & Minimalist)**: Bố cục rõ ràng, sử dụng bảng màu sắc trung tính dịu mắt (`Slate #0f172a`, `Background #f8fafc`, `Card #ffffff`), độ tương phản chuẩn mực, không gây mỏi mắt.
 - **Không icon màu mè**: Thay thế các biểu tượng rườm rà bằng các nhãn văn bản mạch lạc, thẻ trạng thái đơn sắc trang nhã (*Xanh rừng thẫm* cho xu hướng Tăng, *Đỏ đô dịu* cho xu hướng Giảm).
@@ -81,7 +81,7 @@ RNN/
 
 ---
 
-## 🛠️ Công Nghệ Sử Dụng
+## Công Nghệ Sử Dụng
 
 - **Backend**: Python 3, Flask (Mô hình MVC), Gunicorn (WSGI Server cho Production).
 - **Machine Learning / AI**: TensorFlow 2.x, Keras (Stacked SimpleRNN 64-32 units), Scikit-learn (MinMaxScaler), NumPy, Pandas, Joblib.
@@ -90,7 +90,7 @@ RNN/
 
 ---
 
-## 🚀 Hướng Dẫn Chạy Cục Bộ (Local Development)
+## Hướng Dẫn Chạy Cục Bộ (Local Development)
 
 Nếu muốn chạy ứng dụng trực tiếp trên máy tính cá nhân:
 
@@ -108,4 +108,4 @@ pip install -r requirements.txt
   ```
 
 Sau khi máy chủ khởi động, mở trình duyệt và truy cập:
-👉 **`http://127.0.0.1:5000`**
+**`http://127.0.0.1:5000`**
