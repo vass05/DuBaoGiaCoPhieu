@@ -33,7 +33,22 @@ def create_app():
     return app
 
 
+def warm_up():
+    """Tải trước dữ liệu và mô hình AI vào RAM để phản hồi tức thì."""
+    try:
+        from models.data_loader import StockDataLoader
+        from models.predictor import StockPredictor
+        dl = StockDataLoader.get_instance()
+        pred = StockPredictor.get_instance()
+        aapl = dl.get_last_n_days('AAPL', 60)
+        _ = pred.predict_multistep(aapl['close_prices'], n_days=1)
+        print("[App Warm-Up] Model and data pre-warmed successfully!")
+    except Exception as e:
+        print(f"[App Warm-Up Warning] {e}")
+
+
 app = create_app()
+warm_up()
 
 if __name__ == '__main__':
     print("=" * 65)

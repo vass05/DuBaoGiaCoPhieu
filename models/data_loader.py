@@ -39,6 +39,7 @@ class StockDataLoader:
 
     _instance = None
     _df_cache = None
+    _grouped_cache = {}
 
     @classmethod
     def get_instance(cls):
@@ -50,7 +51,7 @@ class StockDataLoader:
         self.data_path = data_path or config.DATA_PATH
 
     def _get_dataframe(self):
-        """Tải dữ liệu 5 năm vào bộ nhớ đệm (Cache) để tối ưu tốc độ phản hồi."""
+        """Tải dữ liệu 5 năm vào bộ nhớ đệm (Cache) và lập chỉ mục O(1) theo mã cổ phiếu."""
         if StockDataLoader._df_cache is None:
             if not os.path.exists(self.data_path):
                 raise FileNotFoundError(f"Không tìm thấy tập dữ liệu: {self.data_path}")
@@ -59,7 +60,11 @@ class StockDataLoader:
             df['date'] = pd.to_datetime(df['date'])
             df = df.sort_values(['Name', 'date'])
             StockDataLoader._df_cache = df
-            print(f"[StockDataLoader] Loaded {len(df):,} rows successfully.")
+            # Lập chỉ mục sẵn vào từ điển theo mã để tra cứu tức thì O(1)
+            StockDataLoader._grouped_cache = {
+                sym: group.copy() for sym, group in df.groupby('Name')
+            }
+            print(f"[StockDataLoader] Loaded {len(df):,} rows and indexed {len(StockDataLoader._grouped_cache)} symbols.")
         return StockDataLoader._df_cache
 
     def get_popular_stocks(self):
@@ -68,14 +73,14 @@ class StockDataLoader:
 
     def get_all_symbols(self):
         """Trả về toàn bộ danh sách mã cổ phiếu có trong tập dữ liệu."""
-        df = self._get_dataframe()
-        return sorted(df['Name'].dropna().unique().tolist())
+        self._get_dataframe()
+        return sorted(list(StockDataLoader._grouped_cache.keys()))
 
     def get_stock_data(self, symbol="AAPL"):
-        """Lấy toàn bộ dữ liệu lịch sử giá của một mã cổ phiếu cụ thể."""
-        df = self._get_dataframe()
-        sub_df = df[df['Name'] == symbol].sort_values('date').copy()
-        if sub_df.empty:
+        """Lấy toàn bộ dữ liệu lịch sử giá của một mã cổ phiếu cụ thể (tra cứu tức thì O(1))."""
+        self._get_dataframe()
+        sub_df = StockDataLoader._grouped_cache.get(symbol)
+        if sub_df is None or sub_df.empty:
             raise ValueError(f"Không tìm thấy mã cổ phiếu: {symbol}")
         return sub_df
 
