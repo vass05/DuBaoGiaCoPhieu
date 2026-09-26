@@ -1,0 +1,187 @@
+{% extends 'base.html' %}
+
+{% block title %}Bảng Điều Khiển Dự Báo - RNN Stock Predictor{% endblock %}
+
+{% block content %}
+
+<!-- Thanh điều khiển chọn mã và số ngày dự báo -->
+<form id="forecast-form" class="control-bar" method="GET" action="{{ url_for('stock.index') }}">
+    <div class="control-group">
+        <label for="stock-select">Mã cổ phiếu</label>
+        <select id="stock-select" name="symbol" class="select-input">
+            {% for item in popular_stocks %}
+            <option value="{{ item.symbol }}" {% if initial_data.symbol == item.symbol %}selected{% endif %}>
+                {{ item.symbol }} - {{ item.name }} {% if item.is_trained %}[Chuẩn]{% endif %}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="control-group">
+        <label for="days-select">Khoảng thời gian dự báo</label>
+        <select id="days-select" name="days" class="select-input">
+            <option value="1" {% if initial_data.forecast_days == 1 %}selected{% endif %}>1 ngày tới (T+1)</option>
+            <option value="3" {% if initial_data.forecast_days == 3 %}selected{% endif %}>3 ngày tới</option>
+            <option value="7" {% if initial_data.forecast_days == 7 %}selected{% endif %}>7 ngày tới (1 tuần)</option>
+            <option value="14" {% if initial_data.forecast_days == 14 %}selected{% endif %}>14 ngày tới (2 tuần)</option>
+            <option value="30" {% if initial_data.forecast_days == 30 %}selected{% endif %}>30 ngày tới (1 tháng)</option>
+        </select>
+    </div>
+
+    <div class="control-group" style="align-self: flex-end;">
+        <button type="submit" class="btn btn-primary" id="btn-submit">
+            Thực Hiện Dự Báo
+        </button>
+    </div>
+
+    <div id="loading-spinner" class="loading-indicator">
+        Đang xử lý dữ liệu...
+    </div>
+</form>
+
+{% if initial_data.error %}
+<div class="alert alert-error">
+    Lỗi xử lý: {{ initial_data.error }}
+</div>
+{% else %}
+
+<!-- Bốn thẻ chỉ số thống kê chính -->
+<div class="grid-cards">
+    <div class="metric-card">
+        <div class="metric-title">Giá đóng cửa gần nhất</div>
+        <div class="metric-number" id="card-latest-price">${{ "%.2f"|format(initial_data.latest_price) }}</div>
+        <div class="metric-sub" id="card-latest-date">Phiên ngày: {{ initial_data.recent_data.latest_date }}</div>
+    </div>
+
+    <div class="metric-card">
+        <div class="metric-title">Giá dự báo ngày tiếp theo</div>
+        <div class="metric-number" id="card-pred-price">${{ "%.2f"|format(initial_data.next_pred_price) }}</div>
+    </div>
+
+    <div class="metric-card">
+        <div class="metric-title">Biến động kỳ vọng</div>
+        <div class="metric-number" id="card-diff">
+            {% if initial_data.day1_diff > 0 %}+{% endif %}{{ "%.2f"|format(initial_data.day1_diff) }} USD
+        </div>
+        <div class="metric-sub" id="card-pct">
+            {% if initial_data.day1_pct > 0 %}+{% endif %}{{ "%.2f"|format(initial_data.day1_pct) }}%
+        </div>
+    </div>
+
+    <div class="metric-card">
+        <div class="metric-title">Xu hướng dự kiến</div>
+        <div style="margin-top: 8px;">
+            <span id="card-trend-badge" class="trend-badge {% if initial_data.trend == 'Tăng' %}up{% elif initial_data.trend == 'Giảm' %}down{% else %}neutral{% endif %}">
+                {{ initial_data.trend }}
+            </span>
+        </div>
+    </div>
+</div>
+
+<!-- Khung biểu đồ trực quan -->
+<div class="panel">
+    <div class="panel-header">
+        <div class="panel-title" id="chart-panel-title">
+            Diễn Biến Giá & Dự Báo ({{ initial_data.symbol }})
+        </div>
+    </div>
+    <div class="chart-container">
+        <canvas id="stockChart"></canvas>
+    </div>
+</div>
+
+<!-- Hai cột bảng chi tiết -->
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+    <!-- Bảng dự báo tương lai -->
+    <div class="panel">
+        <div class="panel-header">
+            <div class="panel-title">Chi Tiết Dự Báo Tương Lai</div>
+        </div>
+        <div class="table-responsive">
+            <table class="data-table" id="forecast-table">
+                <thead>
+                    <tr>
+                        <th>Bước</th>
+                        <th>Giá Dự Báo</th>
+                        <th>Chênh Lệch</th>
+                        <th>Biến Động</th>
+                        <th>Xu Hướng</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in initial_data.predictions %}
+                    <tr>
+                        <td><strong>T+{{ p.step }}</strong></td>
+                        <td class="num">${{ "%.2f"|format(p.predicted_price) }}</td>
+                        <td class="num">
+                            {% if p.change > 0 %}+{% endif %}{{ "%.2f"|format(p.change) }}
+                        </td>
+                        <td class="num">
+                            {% if p.change_percent > 0 %}+{% endif %}{{ "%.2f"|format(p.change_percent) }}%
+                        </td>
+                        <td>
+                            <span class="trend-badge {% if p.trend == 'Tăng' %}up{% elif p.trend == 'Giảm' %}down{% else %}neutral{% endif %}">
+                                {{ p.trend }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Bảng lịch sử 10 phiên gần nhất -->
+    <div class="panel">
+        <div class="panel-header">
+            <div class="panel-title">10 Phiên Gần Nhất</div>
+        </div>
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Ngày</th>
+                        <th>Đóng Cửa</th>
+                        <th>Mở Cửa</th>
+                        <th>Cao Nhất</th>
+                        <th>Thấp Nhất</th>
+                    </tr>
+                </thead>
+                <tbody id="history-table-body">
+                    {% for i in range(initial_data.recent_data.dates|length - 1, [initial_data.recent_data.dates|length - 11, -1]|max, -1) %}
+                    <tr>
+                        <td>{{ initial_data.recent_data.dates[i] }}</td>
+                        <td class="num"><strong>${{ "%.2f"|format(initial_data.recent_data.close_prices[i]) }}</strong></td>
+                        <td class="num">
+                            ${{ "%.2f"|format(initial_data.recent_data.open_prices[i]) if initial_data.recent_data.open_prices else "-" }}
+                        </td>
+                        <td class="num">
+                            ${{ "%.2f"|format(initial_data.recent_data.high_prices[i]) if initial_data.recent_data.high_prices else "-" }}
+                        </td>
+                        <td class="num">
+                            ${{ "%.2f"|format(initial_data.recent_data.low_prices[i]) if initial_data.recent_data.low_prices else "-" }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Dữ liệu khởi tạo từ Controller
+    const initialConfig = {
+        symbol: "{{ initial_data.symbol }}",
+        dates: {{ initial_data.recent_data.dates | tojson if initial_data.recent_data else [] }},
+        closes: {{ initial_data.recent_data.close_prices | tojson if initial_data.recent_data else [] }},
+        predictions: {{ initial_data.predictions | tojson if initial_data.predictions else [] }}
+    };
+</script>
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+{% endblock %}

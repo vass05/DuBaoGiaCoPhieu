@@ -1,0 +1,155 @@
+{% extends 'base.html' %}
+
+{% block title %}Dự Báo Với Dữ Liệu Tùy Biến - RNN Stock Predictor{% endblock %}
+
+{% block content %}
+
+<div class="panel-header" style="margin-bottom: 24px;">
+    <h2 style="font-size: 19px; font-weight: 600; color: var(--text-primary);">Dữ Liệu Tùy Biến</h2>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
+    <!-- Cột 1: Nhập trực tiếp chuỗi số -->
+    <div class="panel" style="margin-bottom: 0;">
+        <div class="panel-header">
+            <div class="panel-title">Nhập Chuỗi Giá (Tối thiểu 60 mức giá)</div>
+        </div>
+
+        <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-load-sample">
+                Điền 60 Giá Mẫu
+            </button>
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-clear-text">
+                Xóa
+            </button>
+        </div>
+
+        <textarea id="custom-text-input" class="textarea-custom" placeholder="Ví dụ: 156.25, 157.10, 158.00, ..."></textarea>
+
+        <div style="display: flex; gap: 12px; align-items: center;">
+            <div class="control-group">
+                <label for="custom-days-select">Số ngày dự báo</label>
+                <select id="custom-days-select" class="select-input">
+                    <option value="1">1 ngày tới (T+1)</option>
+                    <option value="3">3 ngày tới</option>
+                    <option value="7" selected>7 ngày tới</option>
+                    <option value="14">14 ngày tới</option>
+                </select>
+            </div>
+            <div style="margin-top: 22px;">
+                <button type="button" class="btn btn-primary" id="btn-submit-text">
+                    Chạy Dự Báo
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cột 2: Tải lên tệp CSV -->
+    <div class="panel" style="margin-bottom: 0;">
+        <div class="panel-header">
+            <div class="panel-title">Tải Lên Tệp Tin CSV</div>
+        </div>
+
+        <form id="csv-upload-form" enctype="multipart/form-data">
+            <div class="file-upload-box" id="drop-zone" onclick="document.getElementById('file-input').click()">
+                <div style="font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">
+                    Nhấn để chọn tệp CSV hoặc kéo thả vào đây
+                </div>
+                <div id="file-chosen-text" style="font-size: 12.5px; color: var(--text-secondary);">
+                    Chưa chọn tệp tin (.csv)
+                </div>
+                <input type="file" id="file-input" name="file" accept=".csv" style="display: none;">
+            </div>
+
+            <div style="display: flex; gap: 12px; align-items: center;">
+                <div class="control-group">
+                    <label for="csv-days-select">Số ngày dự báo</label>
+                    <select id="csv-days-select" name="days" class="select-input">
+                        <option value="1">1 ngày tới (T+1)</option>
+                        <option value="3">3 ngày tới</option>
+                        <option value="7" selected>7 ngày tới</option>
+                        <option value="14">14 ngày tới</option>
+                    </select>
+                </div>
+                <div style="margin-top: 22px;">
+                    <button type="submit" class="btn btn-primary" id="btn-submit-csv">
+                        Tải Lên & Dự Báo
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Vùng thông báo lỗi hoặc tiến trình -->
+<div id="custom-message" style="display: none;"></div>
+
+<!-- Vùng hiển thị kết quả (mặc định ẩn, hiện khi có kết quả) -->
+<div id="custom-results-area" style="display: none;">
+    <!-- Các thẻ chỉ số -->
+    <div class="grid-cards">
+        <div class="metric-card">
+            <div class="metric-title">Mức giá cuối cùng nạp vào</div>
+            <div class="metric-number" id="custom-card-latest">$0.00</div>
+            <div class="metric-sub" id="custom-card-source">Từ dữ liệu người dùng</div>
+        </div>
+
+        <div class="metric-card">
+            <div class="metric-title">Dự báo phiên tiếp theo (T+1)</div>
+            <div class="metric-number" id="custom-card-next">$0.00</div>
+        </div>
+
+        <div class="metric-card">
+            <div class="metric-title">Biến động kỳ vọng</div>
+            <div class="metric-number" id="custom-card-diff">0.00 USD</div>
+            <div class="metric-sub" id="custom-card-pct">0.00%</div>
+        </div>
+
+        <div class="metric-card">
+            <div class="metric-title">Xu hướng dự kiến</div>
+            <div style="margin-top: 8px;">
+                <span id="custom-card-trend" class="trend-badge neutral">
+                    -
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Biểu đồ -->
+    <div class="panel">
+        <div class="panel-header">
+            <div class="panel-title">Biểu Đồ Dự Báo</div>
+        </div>
+        <div class="chart-container">
+            <canvas id="customChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Bảng chi tiết -->
+    <div class="panel">
+        <div class="panel-header">
+            <div class="panel-title">Chi Tiết Kết Quả Dự Báo</div>
+        </div>
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Bước</th>
+                        <th>Giá Dự Báo (USD)</th>
+                        <th>Chênh Lệch So Với Phiên Trước</th>
+                        <th>Tỷ Lệ Biến Động (%)</th>
+                        <th>Xu Hướng</th>
+                    </tr>
+                </thead>
+                <tbody id="custom-table-body">
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/custom.js') }}"></script>
+{% endblock %}

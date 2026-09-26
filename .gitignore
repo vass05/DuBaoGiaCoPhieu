@@ -1,0 +1,20 @@
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Virtual environments
+venv/
+env/
+.env
+
+# Non-stock datasets to reduce repo upload size
+DATA/Transaction_Data/
+DATA/Weather_Data/
+
+# OS specific files
+.DS_Store
+Thumbs.db

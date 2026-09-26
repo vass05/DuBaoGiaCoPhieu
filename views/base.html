@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Dự Báo Giá Cổ Phiếu - RNN Model{% endblock %}</title>
+    <!-- Stylesheet tối giản, thanh lịch, dễ nhìn -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <!-- Thư viện biểu đồ Chart.js -->
+    <script src="{{ url_for('static', filename='js/chart.umd.min.js') }}"></script>
+</head>
+<body>
+
+    <!-- Header & Navigation -->
+    <header class="app-header">
+        <div class="header-container">
+            <div class="brand">
+                <span class="brand-badge">RNN</span>
+                <h1 class="brand-title">Dự Báo Giá Cổ Phiếu</h1>
+            </div>
+
+            <nav class="nav-links">
+                <a href="{{ url_for('stock.index') }}" class="nav-item {% if active_tab == 'dashboard' %}active{% endif %}">
+                    Dự Báo Thị Trường
+                </a>
+                <a href="{{ url_for('stock.custom_forecast') }}" class="nav-item {% if active_tab == 'custom' %}active{% endif %}">
+                    Dữ Liệu Tùy Biến
+                </a>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="main-wrapper">
+        {% block content %}{% endblock %}
+    </main>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

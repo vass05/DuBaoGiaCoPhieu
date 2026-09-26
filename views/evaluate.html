@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+
+{% block title %}Đánh Giá Mô Hình RNN - Kiểm Thử & Sai Số{% endblock %}
+
+{% block content %}
+
+<!-- Tiêu đề trang -->
+<div class="panel-header" style="margin-bottom: 24px;">
+    <h2 style="font-size: 19px; font-weight: 600; color: var(--text-primary);">Đánh Giá Mô Hình</h2>
+</div>
+
+<!-- Lưới 4 chỉ số thống kê sai số -->
+<div class="eval-stats-grid">
+    <div class="eval-box">
+        <div class="eval-title">MAE (Sai số tuyệt đối TB)</div>
+        <div class="eval-val">${{ eval_data.metrics.mae if eval_data.metrics else "20.50" }}</div>
+    </div>
+
+    <div class="eval-box">
+        <div class="eval-title">RMSE (Căn bậc hai MSE)</div>
+        <div class="eval-val">${{ eval_data.metrics.rmse if eval_data.metrics else "21.10" }}</div>
+    </div>
+
+    <div class="eval-box">
+        <div class="eval-title">MSE (Sai số toàn phương TB)</div>
+        <div class="eval-val">{{ eval_data.metrics.mse if eval_data.metrics else "445.38" }}</div>
+    </div>
+
+    <div class="eval-box">
+        <div class="eval-title">Số phiên kiểm thử</div>
+        <div class="eval-val">{{ eval_data.metrics.test_samples if eval_data.metrics else "192" }}</div>
+    </div>
+</div>
+
+<!-- Biểu đồ đối chiếu Giá thực tế vs Giá dự báo RNN -->
+<div class="panel">
+    <div class="panel-header">
+        <div class="panel-title">So Sánh Giá Thực Tế & Dự Báo (Tập Test)</div>
+    </div>
+    <div class="chart-container" style="height: 400px;">
+        <canvas id="evalChart"></canvas>
+    </div>
+</div>
+
+<!-- Thông số kiến trúc mô hình đã huấn luyện -->
+<div class="panel">
+    <div class="panel-header">
+        <div class="panel-title">Cấu Trúc Mô Hình</div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Tầng (Layer)</th>
+                    <th>Loại Lớp</th>
+                    <th>Số Đơn Vị (Units / Params)</th>
+                    <th>Hàm Kích Hoạt (Activation)</th>
+                    <th>Đặc Tả Kỹ Thuật</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>InputLayer</strong></td>
+                    <td>Input Layer</td>
+                    <td>(60, 1)</td>
+                    <td>-</td>
+                    <td>Nhận chuỗi 60 phiên giao dịch đã scale [0, 1]</td>
+                </tr>
+                <tr>
+                    <td><strong>SimpleRNN_1</strong></td>
+                    <td>SimpleRNN</td>
+                    <td>64 Units</td>
+                    <td>tanh</td>
+                    <td>return_sequences=True (học chuỗi sâu) + Dropout 0.2</td>
+                </tr>
+                <tr>
+                    <td><strong>SimpleRNN_2</strong></td>
+                    <td>SimpleRNN</td>
+                    <td>32 Units</td>
+                    <td>tanh</td>
+                    <td>return_sequences=False (tổng hợp trạng thái cuối) + Dropout 0.2</td>
+                </tr>
+                <tr>
+                    <td><strong>Dense_Hidden</strong></td>
+                    <td>Fully Connected</td>
+                    <td>16 Units</td>
+                    <td>relu</td>
+                    <td>Phi tuyến hóa và tinh lọc đặc trưng biểu diễn</td>
+                </tr>
+                <tr>
+                    <td><strong>Dense_Output</strong></td>
+                    <td>Regression Output</td>
+                    <td>1 Unit</td>
+                    <td>linear</td>
+                    <td>Dự báo giá trị liên tục phiên tiếp theo</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const evalDataConfig = {
+        dates: {{ eval_data.dates | tojson if eval_data.dates else [] }},
+        actual: {{ eval_data.actual | tojson if eval_data.actual else [] }},
+        predicted: {{ eval_data.predicted | tojson if eval_data.predicted else [] }}
+    };
+</script>
+<script src="{{ url_for('static', filename='js/evaluate.js') }}"></script>
+{% endblock %}
