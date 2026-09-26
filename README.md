@@ -24,7 +24,7 @@ RNN/
 ├── render.yaml                 # [DEPLOY] Cấu hình tự động triển khai trên Render.com
 ├── Procfile                    # [DEPLOY] Lệnh khởi chạy WSGI Gunicorn tối ưu bộ nhớ
 ├── requirements.txt            # Danh sách các thư viện phụ thuộc
-├── run_app.bat                 # Script chạy nhanh ứng dụng cục bộ trên Windows
+├── .vscode/                    # Cấu hình môi trường Python cho IDE (tự động nhận diện cnn_env)
 │
 ├── models/                     # [MODEL] Tầng xử lý mô hình AI & Dữ liệu
 │   ├── __init__.py
@@ -94,18 +94,22 @@ RNN/
 
 Nếu muốn chạy ứng dụng trực tiếp trên máy tính cá nhân:
 
-### 1. Cài đặt môi trường
-Yêu cầu Python 3.9 - 3.11. Cài đặt các thư viện phụ thuộc:
+### 1. Kích hoạt môi trường và cài đặt thư viện
+Yêu cầu Python 3.9 - 3.11. Kích hoạt môi trường Conda (hoặc Virtualenv):
 ```bash
+conda activate cnn_env
+# Hoặc cài đặt gói phụ thuộc nếu thiết lập môi trường mới:
 pip install -r requirements.txt
 ```
 
-### 2. Khởi động ứng dụng
-- **Cách 1**: Nhấp đúp vào file [run_app.bat](file:///d:/K%C3%AC%201%20N4/Ph%C3%A1t%20tri%E1%BB%83n%20c%C3%A1c%20h%E1%BB%87%20th%E1%BB%91ng%20th%C3%B4ng%20minh/RNN/run_app.bat).
-- **Cách 2**: Chạy lệnh từ terminal:
-  ```bash
-  python app.py
-  ```
+> **Lưu ý cho VS Code / IDE:** Thư mục `.vscode/settings.json` đã được thiết lập sẵn Interpreter trỏ tới môi trường `cnn_env` để trình soạn thảo nhận diện đúng các thư viện `flask` và `tensorflow` (không bị gạch chân đỏ cảnh báo import).
 
-Sau khi máy chủ khởi động, mở trình duyệt và truy cập:
-**`http://127.0.0.1:5000`**
+### 2. Khởi động ứng dụng
+Chạy trực tiếp file `app.py` từ Terminal:
+```bash
+python app.py
+```
+
+### 3. Truy cập hệ thống
+Sau khi máy chủ khởi động và nạp dữ liệu/mô hình vào bộ nhớ RAM, mở trình duyệt web và truy cập:
+👉 **`http://127.0.0.1:5000`** *(hoặc `http://localhost:5000`)*
