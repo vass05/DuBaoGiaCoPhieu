@@ -63,7 +63,7 @@
             {% if initial_data.is_vn %}
             {{ "{:,.0f}".format(initial_data.latest_price) }} VND
             {% else %}
-            ${{ "%.2f"|format(initial_data.latest_price) }}
+            {{ "%.2f"|format(initial_data.latest_price) }} USD
             {% endif %}
         </div>
         <div class="metric-sub" id="card-latest-date">Phiên ngày: {{ initial_data.recent_data.latest_date }}</div>
@@ -81,14 +81,14 @@
             {% if initial_data.is_vn %}
             {{ "{:,.0f}".format(initial_data.next_pred_price) }} VND
             {% else %}
-            ${{ "%.2f"|format(initial_data.next_pred_price) }}
+            {{ "%.2f"|format(initial_data.next_pred_price) }} USD
             {% endif %}
         </div>
         <div class="metric-sub" id="card-pred-sub" style="{% if initial_data.forecast_days <= 1 %}display: none;{% endif %}">
             {% if initial_data.is_vn %}
             Phiên T+1: {{ "{:,.0f}".format(initial_data.day1_price) }} VND
             {% else %}
-            Phiên T+1: ${{ "%.2f"|format(initial_data.day1_price) }}
+            Phiên T+1: {{ "%.2f"|format(initial_data.day1_price) }} USD
             {% endif %}
         </div>
     </div>
@@ -182,14 +182,14 @@
                             {% if initial_data.is_vn %}
                             {{ "{:,.0f}".format(p.predicted_price) }} VND
                             {% else %}
-                            ${{ "%.2f"|format(p.predicted_price) }}
+                            {{ "%.2f"|format(p.predicted_price) }} USD
                             {% endif %}
                         </td>
                         <td class="num">
                             {% if initial_data.is_vn %}
                             {% if p.change > 0 %}+{% endif %}{{ "{:,.0f}".format(p.change) }} VND
                             {% else %}
-                            {% if p.change > 0 %}+{% endif %}{{ "%.2f"|format(p.change) }}
+                            {% if p.change > 0 %}+{% endif %}{{ "%.2f"|format(p.change) }} USD
                             {% endif %}
                         </td>
                         <td class="num">
@@ -234,7 +234,7 @@
                                 {% if initial_data.is_vn %}
                                 {{ "{:,.0f}".format(initial_data.recent_data.close_prices[i]) }} VND
                                 {% else %}
-                                ${{ "%.2f"|format(initial_data.recent_data.close_prices[i]) }}
+                                {{ "%.2f"|format(initial_data.recent_data.close_prices[i]) }} USD
                                 {% endif %}
                             </strong>
                         </td>
@@ -243,7 +243,7 @@
                             {% if initial_data.is_vn %}
                             {{ "{:,.0f}".format(initial_data.recent_data.open_prices[i]) }}
                             {% else %}
-                            ${{ "%.2f"|format(initial_data.recent_data.open_prices[i]) }}
+                            {{ "%.2f"|format(initial_data.recent_data.open_prices[i]) }} USD
                             {% endif %}
                             {% else %}-{% endif %}
                         </td>
@@ -252,7 +252,7 @@
                             {% if initial_data.is_vn %}
                             {{ "{:,.0f}".format(initial_data.recent_data.high_prices[i]) }}
                             {% else %}
-                            ${{ "%.2f"|format(initial_data.recent_data.high_prices[i]) }}
+                            {{ "%.2f"|format(initial_data.recent_data.high_prices[i]) }} USD
                             {% endif %}
                             {% else %}-{% endif %}
                         </td>
@@ -261,7 +261,7 @@
                             {% if initial_data.is_vn %}
                             {{ "{:,.0f}".format(initial_data.recent_data.low_prices[i]) }}
                             {% else %}
-                            ${{ "%.2f"|format(initial_data.recent_data.low_prices[i]) }}
+                            {{ "%.2f"|format(initial_data.recent_data.low_prices[i]) }} USD
                             {% endif %}
                             {% else %}-{% endif %}
                         </td>
@@ -290,5 +290,5 @@
         predictions: {{ (initial_data.predictions | tojson) if initial_data.predictions else '[]' }}
     };
 </script>
-<script src="{{ url_for('static', filename='js/main.js') }}?v=2.1"></script>
+<script src="{{ url_for('static', filename='js/main.js') }}?v=2.2"></script>
 {% endblock %}

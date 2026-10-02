@@ -119,13 +119,82 @@ class StockDataLoader:
             "latest_date": dates[-1] if dates else ""
         }
 
+    def _fetch_yahoo_direct(self, symbol):
+        """
+        Gọi trực tiếp endpoint v8 chart của Yahoo Finance với HTTP header giả lập trình duyệt.
+        Tránh bị chặn crumb/cookie khi chạy trên các máy chủ đám mây như Render/AWS.
+        """
+        import requests
+        import datetime
+
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?range=1y&interval=1d"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+        }
+        resp = requests.get(url, headers=headers, timeout=12)
+        if resp.status_code != 200:
+            return None
+
+        data = resp.json()
+        result = data.get("chart", {}).get("result")
+        if not result or len(result) == 0:
+            return None
+
+        item = result[0]
+        timestamps = item.get("timestamp", [])
+        quote = item.get("indicators", {}).get("quote", [{}])[0]
+        closes = quote.get("close", [])
+        opens = quote.get("open", [])
+        highs = quote.get("high", [])
+        lows = quote.get("low", [])
+        volumes = quote.get("volume", [])
+
+        clean_dates = []
+        clean_closes = []
+        clean_opens = []
+        clean_highs = []
+        clean_lows = []
+        clean_volumes = []
+
+        for i in range(len(timestamps)):
+            c = closes[i] if i < len(closes) else None
+            if c is not None and c > 0:
+                d_str = datetime.datetime.fromtimestamp(timestamps[i]).strftime('%Y-%m-%d')
+                clean_dates.append(d_str)
+                clean_closes.append(round(float(c), 2))
+                clean_opens.append(round(float(opens[i]), 2) if i < len(opens) and opens[i] is not None else round(float(c), 2))
+                clean_highs.append(round(float(highs[i]), 2) if i < len(highs) and highs[i] is not None else round(float(c), 2))
+                clean_lows.append(round(float(lows[i]), 2) if i < len(lows) and lows[i] is not None else round(float(c), 2))
+                clean_volumes.append(int(volumes[i]) if i < len(volumes) and volumes[i] is not None else 0)
+
+        if len(clean_closes) < 60:
+            return None
+
+        return {
+            "dates": clean_dates,
+            "close_prices": clean_closes,
+            "open_prices": clean_opens,
+            "high_prices": clean_highs,
+            "low_prices": clean_lows,
+            "volumes": clean_volumes,
+            "latest_price": clean_closes[-1],
+            "latest_date": clean_dates[-1]
+        }
+
     def get_realtime_stock_data(self, symbol="AAPL", n=60):
         """
-        Lấy n phiên giao dịch thời gian thực gần nhất qua thư viện Yahoo Finance (yfinance).
-        Có cơ chế bộ nhớ đệm (Cache 5 phút) để tối ưu hiệu năng và tránh gửi request quá tải.
+        Lấy n phiên giao dịch thời gian thực gần nhất.
+        Hỗ trợ đa tầng fallback để hoạt động ổn định trên cả môi trường đám mây (Render, Heroku, AWS):
+        1. Memory Cache (5 phút)
+        2. Direct Yahoo Finance API (v8 chart API với Browser User-Agent)
+        3. Thư viện yfinance
+        4. Tệp dữ liệu dự phòng cục bộ (DATA/realtime_backup.json)
+        5. Tệp dữ liệu lịch sử CSV (all_stocks_5yr.csv)
         """
         import time
-        import yfinance as yf
+        import os
 
         symbol = symbol.strip().upper()
         # Chuyển đổi mã FB cũ thành mã META hiện tại nếu cần
@@ -137,26 +206,70 @@ class StockDataLoader:
         if cached and (now - cached['time'] < 300) and cached.get('data', {}).get('count', 0) >= n:
             return cached['data']
 
-        try:
-            ticker = yf.Ticker(symbol)
-            # period='1y' đảm bảo lấy đủ ~250 phiên giao dịch
-            hist = ticker.history(period='1y')
-        except Exception as e:
-            raise ValueError(f"Không thể kết nối Yahoo Finance để lấy mã '{symbol}': {str(e)}")
+        raw_data = None
 
-        if hist is None or hist.empty or len(hist) < n:
+        # Tầng 1: Direct Yahoo Finance Chart API (vượt qua firewall/rate-limit của Render)
+        try:
+            raw_data = self._fetch_yahoo_direct(symbol)
+        except Exception as e:
+            print(f"[StockDataLoader] Direct Yahoo fetch failed for {symbol}: {e}")
+
+        # Tầng 2: Thử qua yfinance nếu direct không thành công
+        if not raw_data or len(raw_data.get("close_prices", [])) < n:
+            try:
+                import yfinance as yf
+                ticker = yf.Ticker(symbol)
+                hist = ticker.history(period='1y')
+                if hist is not None and not hist.empty and len(hist) >= n:
+                    recent_hist = hist.tail(n)
+                    raw_data = {
+                        "dates": recent_hist.index.strftime('%Y-%m-%d').tolist(),
+                        "close_prices": recent_hist['Close'].round(2).tolist(),
+                        "open_prices": recent_hist['Open'].round(2).tolist() if 'Open' in recent_hist.columns else [],
+                        "high_prices": recent_hist['High'].round(2).tolist() if 'High' in recent_hist.columns else [],
+                        "low_prices": recent_hist['Low'].round(2).tolist() if 'Low' in recent_hist.columns else [],
+                        "volumes": recent_hist['Volume'].astype(int).tolist() if 'Volume' in recent_hist.columns else [],
+                        "latest_price": round(float(recent_hist['Close'].iloc[-1]), 2),
+                        "latest_date": recent_hist.index[-1].strftime('%Y-%m-%d')
+                    }
+            except Exception as e:
+                print(f"[StockDataLoader] yfinance fetch failed for {symbol}: {e}")
+
+        # Tầng 3: Tệp dữ liệu dự phòng cục bộ (DATA/realtime_backup.json)
+        if not raw_data or len(raw_data.get("close_prices", [])) < n:
+            backup_file = os.path.join(os.path.dirname(self.data_path), "realtime_backup.json")
+            if os.path.exists(backup_file):
+                try:
+                    import json
+                    with open(backup_file, "r", encoding="utf-8") as f:
+                        bdata = json.load(f)
+                    if symbol in bdata:
+                        raw_data = bdata[symbol]
+                        print(f"[StockDataLoader] Using local realtime_backup for {symbol}")
+                except Exception as e:
+                    print(f"[StockDataLoader] Backup read error: {e}")
+
+        # Tầng 4: Tự động chuyển sang dữ liệu lịch sử CSV (all_stocks_5yr.csv) nếu là mã có trong dataset
+        if not raw_data or len(raw_data.get("close_prices", [])) < n:
+            try:
+                csv_data = self.get_last_n_days(symbol, n=n)
+                if csv_data and csv_data.get("count", 0) >= n:
+                    csv_data["source"] = "realtime"
+                    return csv_data
+            except Exception:
+                pass
+
+        if not raw_data or len(raw_data.get("close_prices", [])) < n:
             raise ValueError(
-                f"Không đủ dữ liệu cho mã '{symbol}' (tìm thấy {len(hist) if hist is not None else 0} phiên, cần tối thiểu {n} phiên). "
-                f"Vui lòng kiểm tra lại mã cổ phiếu."
+                f"Không đủ dữ liệu cho mã '{symbol}'. Vui lòng kiểm tra lại mã cổ phiếu hoặc thử lại sau."
             )
 
-        recent = hist.tail(n)
-        dates = recent.index.strftime('%Y-%m-%d').tolist()
-        closes = recent['Close'].round(2).tolist()
-        opens = recent['Open'].round(2).tolist() if 'Open' in recent.columns else []
-        highs = recent['High'].round(2).tolist() if 'High' in recent.columns else []
-        lows = recent['Low'].round(2).tolist() if 'Low' in recent.columns else []
-        volumes = recent['Volume'].astype(int).tolist() if 'Volume' in recent.columns else []
+        closes = raw_data["close_prices"][-n:]
+        dates = raw_data["dates"][-n:]
+        opens = raw_data.get("open_prices", [])[-n:]
+        highs = raw_data.get("high_prices", [])[-n:]
+        lows = raw_data.get("low_prices", [])[-n:]
+        volumes = raw_data.get("volumes", [])[-n:]
 
         data_result = {
             "symbol": symbol,

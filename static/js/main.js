@@ -13,7 +13,7 @@ function formatPrice(val, isVn = false) {
     if (isVn) {
         return Math.round(val).toLocaleString('vi-VN') + ' VND';
     }
-    return '$' + Number(val).toFixed(2);
+    return Number(val).toFixed(2) + ' USD';
 }
 
 /**
@@ -332,7 +332,7 @@ function renderMainChart(dates, historicalPrices, predictions, symbol, isVn = fa
                             if (isVn) {
                                 return Math.round(val).toLocaleString('vi-VN') + ' đ';
                             }
-                            return '$' + val;
+                            return val + ' USD';
                         }
                     }
                 }

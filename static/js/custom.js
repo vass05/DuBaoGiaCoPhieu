@@ -145,9 +145,9 @@ function displayResults(data, sourceLabel) {
     resArea.style.display = 'block';
 
     // 1. Cập nhật thẻ
-    document.getElementById('custom-card-latest').textContent = `$${data.latest_price.toFixed(2)}`;
+    document.getElementById('custom-card-latest').textContent = `${data.latest_price.toFixed(2)} USD`;
     document.getElementById('custom-card-source').textContent = sourceLabel;
-    document.getElementById('custom-card-next').textContent = `$${data.next_pred_price.toFixed(2)}`;
+    document.getElementById('custom-card-next').textContent = `${data.next_pred_price.toFixed(2)} USD`;
 
     const diffPrefix = data.diff > 0 ? '+' : '';
     const pctPrefix = data.pct > 0 ? '+' : '';
@@ -169,8 +169,8 @@ function displayResults(data, sourceLabel) {
 
         tr.innerHTML = `
             <td><strong>T+${p.step}</strong></td>
-            <td class="num">$${p.predicted_price.toFixed(2)}</td>
-            <td class="num">${diffP}${p.change.toFixed(2)}</td>
+            <td class="num">${p.predicted_price.toFixed(2)} USD</td>
+            <td class="num">${diffP}${p.change.toFixed(2)} USD</td>
             <td class="num">${pctP}${p.change_percent.toFixed(2)}%</td>
             <td><span class="trend-badge ${bClass}">${p.trend}</span></td>
         `;
@@ -252,7 +252,7 @@ function renderCustomChart(historical, predictions) {
                     ticks: {
                         color: '#64748b',
                         font: { size: 11 },
-                        callback: val => '$' + val
+                        callback: val => val + ' USD'
                     }
                 }
             }
