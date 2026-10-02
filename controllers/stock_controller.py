@@ -28,43 +28,78 @@ _cached_evaluation = None
 @stock_bp.route('/')
 def index():
     """Trang chủ: Bảng điều khiển dự báo giá cổ phiếu."""
-    symbol = request.args.get('symbol', config.DEFAULT_SYMBOL)
+    symbol = request.args.get('symbol', config.DEFAULT_SYMBOL).strip().upper()
     forecast_days = int(request.args.get('days', 7))
+    source = request.args.get('source', 'realtime').lower()
+    if source not in ['realtime', 'offline']:
+        source = 'realtime'
 
     popular_stocks = data_loader.get_popular_stocks()
     model_summary = predictor.get_model_summary()
 
     try:
-        # Lấy dữ liệu 60 phiên gần nhất từ Model
-        recent_data = data_loader.get_last_n_days(symbol, n=config.TIME_STEPS)
+        if source == 'realtime':
+            recent_data = data_loader.get_realtime_stock_data(symbol, n=config.TIME_STEPS)
+            use_dynamic_scale = True
+        else:
+            recent_data = data_loader.get_last_n_days(symbol, n=config.TIME_STEPS)
+            use_dynamic_scale = (symbol != "AAPL") or (recent_data["latest_price"] > 133 or recent_data["latest_price"] < 55)
+
         closes = recent_data["close_prices"]
 
         # Dự báo n ngày tiếp theo
-        is_aapl = (symbol == "AAPL")
         predictions = predictor.predict_multistep(
             closes, 
             n_days=forecast_days, 
-            dynamic_scale=not is_aapl
+            dynamic_scale=use_dynamic_scale
         )
 
         latest_price = recent_data["latest_price"]
-        next_pred_price = predictions[0]["predicted_price"] if predictions else latest_price
-        day1_diff = next_pred_price - latest_price
+        day1_price = predictions[0]["predicted_price"] if predictions else latest_price
+        day1_diff = day1_price - latest_price
         day1_pct = (day1_diff / latest_price * 100) if latest_price else 0
+        day1_trend = "Tăng" if day1_diff > 0 else ("Giảm" if day1_diff < 0 else "Đi ngang")
+
+        # Đánh giá theo toàn bộ chu kỳ dự báo (nếu forecast_days > 1)
+        final_price = predictions[-1]["predicted_price"] if predictions else latest_price
+        target_price = final_price if forecast_days > 1 else day1_price
+        diff = target_price - latest_price
+        pct = (diff / latest_price * 100) if latest_price else 0
+        trend = "Tăng" if diff > 0 else ("Giảm" if diff < 0 else "Đi ngang")
+
+        is_vn = symbol.endswith('.VN')
+        currency = "VND" if is_vn else "USD"
 
         initial_data = {
-            "symbol": symbol,
+            "symbol": recent_data["symbol"],
+            "is_vn": is_vn,
+            "currency": currency,
+            "source": source,
             "forecast_days": forecast_days,
             "recent_data": recent_data,
             "predictions": predictions,
             "latest_price": latest_price,
-            "next_pred_price": next_pred_price,
+            "day1_price": day1_price,
             "day1_diff": round(day1_diff, 2),
             "day1_pct": round(day1_pct, 2),
-            "trend": "Tăng" if day1_diff > 0 else ("Giảm" if day1_diff < 0 else "Đi ngang")
+            "day1_trend": day1_trend,
+            "final_price": final_price,
+            "target_price": target_price,
+            "next_pred_price": target_price,
+            "diff": round(diff, 2),
+            "pct": round(pct, 2),
+            "trend": trend
         }
     except Exception as e:
-        initial_data = {"error": str(e), "symbol": symbol, "forecast_days": forecast_days}
+        is_vn = symbol.endswith('.VN')
+        initial_data = {
+            "error": str(e), 
+            "symbol": symbol, 
+            "is_vn": is_vn,
+            "currency": "VND" if is_vn else "USD",
+            "source": source,
+            "forecast_days": forecast_days
+        }
 
     return render_template(
         'index.html',
@@ -98,34 +133,65 @@ def custom_forecast():
 
 @stock_bp.route('/api/stock/<symbol>')
 def api_get_stock_forecast(symbol):
-    """API lấy dữ liệu lịch sử và kết quả dự báo của một mã cổ phiếu."""
+    """API lấy dữ liệu lịch sử và kết quả dự báo của một mã cổ phiếu (Realtime & Offline)."""
     try:
         days = int(request.args.get('days', 7))
-        recent_data = data_loader.get_last_n_days(symbol, n=config.TIME_STEPS)
+        source = request.args.get('source', 'realtime').lower()
+        symbol = symbol.strip().upper()
+        is_vn = symbol.endswith('.VN')
+        currency = "VND" if is_vn else "USD"
+
+        if source == 'realtime':
+            recent_data = data_loader.get_realtime_stock_data(symbol, n=config.TIME_STEPS)
+            use_dynamic_scale = True
+        else:
+            recent_data = data_loader.get_last_n_days(symbol, n=config.TIME_STEPS)
+            use_dynamic_scale = (symbol != "AAPL") or (recent_data["latest_price"] > 133 or recent_data["latest_price"] < 55)
+
         closes = recent_data["close_prices"]
 
-        is_aapl = (symbol == "AAPL")
         predictions = predictor.predict_multistep(
             closes, 
             n_days=days, 
-            dynamic_scale=not is_aapl
+            dynamic_scale=use_dynamic_scale
         )
 
         latest_price = recent_data["latest_price"]
-        next_pred = predictions[0]["predicted_price"] if predictions else latest_price
-        diff = round(next_pred - latest_price, 2)
+        day1_price = predictions[0]["predicted_price"] if predictions else latest_price
+        day1_diff = round(day1_price - latest_price, 2)
+        day1_pct = round((day1_diff / latest_price * 100), 2) if latest_price else 0
+        day1_trend = "Tăng" if day1_diff > 0 else ("Giảm" if day1_diff < 0 else "Đi ngang")
+
+        final_price = predictions[-1]["predicted_price"] if predictions else latest_price
+        target_price = final_price if days > 1 else day1_price
+        diff = round(target_price - latest_price, 2)
         pct = round((diff / latest_price * 100), 2) if latest_price else 0
+        trend = "Tăng" if diff > 0 else ("Giảm" if diff < 0 else "Đi ngang")
 
         return jsonify({
             "success": True,
-            "symbol": symbol,
+            "source": recent_data.get("source", source),
+            "symbol": recent_data["symbol"],
+            "is_vn": is_vn,
+            "currency": currency,
+            "forecast_days": days,
             "dates": recent_data["dates"],
             "close_prices": closes,
+            "open_prices": recent_data.get("open_prices", []),
+            "high_prices": recent_data.get("high_prices", []),
+            "low_prices": recent_data.get("low_prices", []),
             "latest_price": latest_price,
-            "next_pred_price": next_pred,
+            "latest_date": recent_data.get("latest_date", ""),
+            "day1_price": day1_price,
+            "day1_diff": day1_diff,
+            "day1_pct": day1_pct,
+            "day1_trend": day1_trend,
+            "final_price": final_price,
+            "target_price": target_price,
+            "next_pred_price": target_price,
             "diff": diff,
             "pct": pct,
-            "trend": "Tăng" if diff > 0 else ("Giảm" if diff < 0 else "Đi ngang"),
+            "trend": trend,
             "predictions": predictions
         })
     except Exception as e:
@@ -218,11 +284,21 @@ def api_upload_csv():
 def api_sample_data():
     """API cung cấp sẵn 60 mức giá thực tế mẫu để người dùng thử nghiệm nhanh."""
     try:
-        sample = data_loader.get_last_n_days("AAPL", n=config.TIME_STEPS)
+        source = request.args.get('source', 'realtime').lower()
+        symbol = request.args.get('symbol', 'AAPL').strip().upper()
+        if source == 'realtime':
+            try:
+                sample = data_loader.get_realtime_stock_data(symbol, n=config.TIME_STEPS)
+            except Exception:
+                sample = data_loader.get_last_n_days(symbol, n=config.TIME_STEPS)
+        else:
+            sample = data_loader.get_last_n_days(symbol, n=config.TIME_STEPS)
+
         formatted_str = ", ".join([str(p) for p in sample["close_prices"]])
         return jsonify({
             "success": True,
-            "symbol": "AAPL",
+            "symbol": sample.get("symbol", symbol),
+            "source": sample.get("source", source),
             "count": len(sample["close_prices"]),
             "text": formatted_str,
             "prices": sample["close_prices"]

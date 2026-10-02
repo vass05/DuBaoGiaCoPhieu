@@ -4,14 +4,24 @@
 
 {% block content %}
 
-<!-- Thanh điều khiển chọn mã và số ngày dự báo -->
+<!-- Thanh điều khiển chọn nguồn dữ liệu, mã và số ngày dự báo -->
 <form id="forecast-form" class="control-bar" method="GET" action="{{ url_for('stock.index') }}">
+    <div class="control-group">
+        <label for="source-select">Nguồn dữ liệu</label>
+        <select id="source-select" name="source" class="select-input">
+            <option value="realtime" {% if initial_data.source=='realtime' %}selected{% endif %}>⚡ Thời gian thực (Yahoo
+                Finance)</option>
+            <option value="offline" {% if initial_data.source=='offline' %}selected{% endif %}>📂 Dữ liệu mẫu (Lịch sử
+                CSV 2018)</option>
+        </select>
+    </div>
+
     <div class="control-group">
         <label for="stock-select">Mã cổ phiếu</label>
         <select id="stock-select" name="symbol" class="select-input">
             {% for item in popular_stocks %}
-            <option value="{{ item.symbol }}" {% if initial_data.symbol == item.symbol %}selected{% endif %}>
-                {{ item.symbol }} - {{ item.name }} {% if item.is_trained %}[Chuẩn]{% endif %}
+            <option value="{{ item.symbol }}" {% if initial_data.symbol==item.symbol %}selected{% endif %}>
+                {{ item.symbol }} - {{ item.name }}
             </option>
             {% endfor %}
         </select>
@@ -20,11 +30,11 @@
     <div class="control-group">
         <label for="days-select">Khoảng thời gian dự báo</label>
         <select id="days-select" name="days" class="select-input">
-            <option value="1" {% if initial_data.forecast_days == 1 %}selected{% endif %}>1 ngày tới (T+1)</option>
-            <option value="3" {% if initial_data.forecast_days == 3 %}selected{% endif %}>3 ngày tới</option>
-            <option value="7" {% if initial_data.forecast_days == 7 %}selected{% endif %}>7 ngày tới (1 tuần)</option>
-            <option value="14" {% if initial_data.forecast_days == 14 %}selected{% endif %}>14 ngày tới (2 tuần)</option>
-            <option value="30" {% if initial_data.forecast_days == 30 %}selected{% endif %}>30 ngày tới (1 tháng)</option>
+            <option value="1" {% if initial_data.forecast_days==1 %}selected{% endif %}>1 ngày tới (T+1)</option>
+            <option value="3" {% if initial_data.forecast_days==3 %}selected{% endif %}>3 ngày tới</option>
+            <option value="7" {% if initial_data.forecast_days==7 %}selected{% endif %}>7 ngày tới (1 tuần)</option>
+            <option value="14" {% if initial_data.forecast_days==14 %}selected{% endif %}>14 ngày tới (2 tuần)</option>
+            <option value="30" {% if initial_data.forecast_days==30 %}selected{% endif %}>30 ngày tới (1 tháng)</option>
         </select>
     </div>
 
@@ -35,7 +45,7 @@
     </div>
 
     <div id="loading-spinner" class="loading-indicator">
-        Đang xử lý dữ liệu...
+        Đang tải dữ liệu...
     </div>
 </form>
 
@@ -49,40 +59,96 @@
 <div class="grid-cards">
     <div class="metric-card">
         <div class="metric-title">Giá đóng cửa gần nhất</div>
-        <div class="metric-number" id="card-latest-price">${{ "%.2f"|format(initial_data.latest_price) }}</div>
+        <div class="metric-number" id="card-latest-price">
+            {% if initial_data.is_vn %}
+            {{ "{:,.0f}".format(initial_data.latest_price) }} VND
+            {% else %}
+            ${{ "%.2f"|format(initial_data.latest_price) }}
+            {% endif %}
+        </div>
         <div class="metric-sub" id="card-latest-date">Phiên ngày: {{ initial_data.recent_data.latest_date }}</div>
     </div>
 
     <div class="metric-card">
-        <div class="metric-title">Giá dự báo ngày tiếp theo</div>
-        <div class="metric-number" id="card-pred-price">${{ "%.2f"|format(initial_data.next_pred_price) }}</div>
+        <div class="metric-title" id="card-pred-title">
+            {% if initial_data.forecast_days > 1 %}
+            Giá dự báo cuối kỳ (T+{{ initial_data.forecast_days }})
+            {% else %}
+            Giá dự báo ngày tiếp theo (T+1)
+            {% endif %}
+        </div>
+        <div class="metric-number" id="card-pred-price">
+            {% if initial_data.is_vn %}
+            {{ "{:,.0f}".format(initial_data.next_pred_price) }} VND
+            {% else %}
+            ${{ "%.2f"|format(initial_data.next_pred_price) }}
+            {% endif %}
+        </div>
+        <div class="metric-sub" id="card-pred-sub" style="{% if initial_data.forecast_days <= 1 %}display: none;{% endif %}">
+            {% if initial_data.is_vn %}
+            Phiên T+1: {{ "{:,.0f}".format(initial_data.day1_price) }} VND
+            {% else %}
+            Phiên T+1: ${{ "%.2f"|format(initial_data.day1_price) }}
+            {% endif %}
+        </div>
     </div>
 
     <div class="metric-card">
-        <div class="metric-title">Biến động kỳ vọng</div>
+        <div class="metric-title" id="card-diff-title">
+            {% if initial_data.forecast_days > 1 %}
+            Biến động cả kỳ ({{ initial_data.forecast_days }} ngày)
+            {% else %}
+            Biến động kỳ vọng (T+1)
+            {% endif %}
+        </div>
         <div class="metric-number" id="card-diff">
-            {% if initial_data.day1_diff > 0 %}+{% endif %}{{ "%.2f"|format(initial_data.day1_diff) }} USD
+            {% if initial_data.is_vn %}
+            {% if initial_data.diff > 0 %}+{% endif %}{{ "{:,.0f}".format(initial_data.diff) }} VND
+            {% else %}
+            {% if initial_data.diff > 0 %}+{% endif %}{{ "%.2f"|format(initial_data.diff) }} USD
+            {% endif %}
         </div>
         <div class="metric-sub" id="card-pct">
-            {% if initial_data.day1_pct > 0 %}+{% endif %}{{ "%.2f"|format(initial_data.day1_pct) }}%
+            {% if initial_data.pct > 0 %}+{% endif %}{{ "%.2f"|format(initial_data.pct) }}%
+            {% if initial_data.forecast_days > 1 %}
+            (T+1: {% if initial_data.day1_pct > 0 %}+{% endif %}{{ "%.2f"|format(initial_data.day1_pct) }}%)
+            {% endif %}
         </div>
     </div>
 
     <div class="metric-card">
-        <div class="metric-title">Xu hướng dự kiến</div>
+        <div class="metric-title" id="card-trend-title">
+            {% if initial_data.forecast_days > 1 %}
+            Xu hướng kỳ {{ initial_data.forecast_days }} ngày
+            {% else %}
+            Xu hướng dự kiến
+            {% endif %}
+        </div>
         <div style="margin-top: 8px;">
-            <span id="card-trend-badge" class="trend-badge {% if initial_data.trend == 'Tăng' %}up{% elif initial_data.trend == 'Giảm' %}down{% else %}neutral{% endif %}">
+            <span id="card-trend-badge"
+                class="trend-badge {% if initial_data.trend == 'Tăng' %}up{% elif initial_data.trend == 'Giảm' %}down{% else %}neutral{% endif %}">
                 {{ initial_data.trend }}
             </span>
+        </div>
+        <div class="metric-sub" id="card-trend-sub" style="margin-top: 6px; {% if initial_data.forecast_days <= 1 %}display: none;{% endif %}">
+            Phiên T+1: {{ initial_data.day1_trend }}
         </div>
     </div>
 </div>
 
 <!-- Khung biểu đồ trực quan -->
 <div class="panel">
-    <div class="panel-header">
+    <div class="panel-header"
+        style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
         <div class="panel-title" id="chart-panel-title">
             Diễn Biến Giá & Dự Báo ({{ initial_data.symbol }})
+        </div>
+        <div id="source-badge-container">
+            {% if initial_data.source == 'realtime' %}
+            <span class="badge-source live" id="source-badge">⚡ Trực tuyến (Yahoo Finance)</span>
+            {% else %}
+            <span class="badge-source offline" id="source-badge">📂 Ngoại tuyến (CSV 2018)</span>
+            {% endif %}
         </div>
     </div>
     <div class="chart-container">
@@ -112,15 +178,26 @@
                     {% for p in initial_data.predictions %}
                     <tr>
                         <td><strong>T+{{ p.step }}</strong></td>
-                        <td class="num">${{ "%.2f"|format(p.predicted_price) }}</td>
                         <td class="num">
+                            {% if initial_data.is_vn %}
+                            {{ "{:,.0f}".format(p.predicted_price) }} VND
+                            {% else %}
+                            ${{ "%.2f"|format(p.predicted_price) }}
+                            {% endif %}
+                        </td>
+                        <td class="num">
+                            {% if initial_data.is_vn %}
+                            {% if p.change > 0 %}+{% endif %}{{ "{:,.0f}".format(p.change) }} VND
+                            {% else %}
                             {% if p.change > 0 %}+{% endif %}{{ "%.2f"|format(p.change) }}
+                            {% endif %}
                         </td>
                         <td class="num">
                             {% if p.change_percent > 0 %}+{% endif %}{{ "%.2f"|format(p.change_percent) }}%
                         </td>
                         <td>
-                            <span class="trend-badge {% if p.trend == 'Tăng' %}up{% elif p.trend == 'Giảm' %}down{% else %}neutral{% endif %}">
+                            <span
+                                class="trend-badge {% if p.trend == 'Tăng' %}up{% elif p.trend == 'Giảm' %}down{% else %}neutral{% endif %}">
                                 {{ p.trend }}
                             </span>
                         </td>
@@ -148,18 +225,45 @@
                     </tr>
                 </thead>
                 <tbody id="history-table-body">
-                    {% for i in range(initial_data.recent_data.dates|length - 1, [initial_data.recent_data.dates|length - 11, -1]|max, -1) %}
+                    {% for i in range(initial_data.recent_data.dates|length - 1, [initial_data.recent_data.dates|length
+                    - 11, -1]|max, -1) %}
                     <tr>
                         <td>{{ initial_data.recent_data.dates[i] }}</td>
-                        <td class="num"><strong>${{ "%.2f"|format(initial_data.recent_data.close_prices[i]) }}</strong></td>
                         <td class="num">
-                            ${{ "%.2f"|format(initial_data.recent_data.open_prices[i]) if initial_data.recent_data.open_prices else "-" }}
+                            <strong>
+                                {% if initial_data.is_vn %}
+                                {{ "{:,.0f}".format(initial_data.recent_data.close_prices[i]) }} VND
+                                {% else %}
+                                ${{ "%.2f"|format(initial_data.recent_data.close_prices[i]) }}
+                                {% endif %}
+                            </strong>
                         </td>
                         <td class="num">
-                            ${{ "%.2f"|format(initial_data.recent_data.high_prices[i]) if initial_data.recent_data.high_prices else "-" }}
+                            {% if initial_data.recent_data.open_prices %}
+                            {% if initial_data.is_vn %}
+                            {{ "{:,.0f}".format(initial_data.recent_data.open_prices[i]) }}
+                            {% else %}
+                            ${{ "%.2f"|format(initial_data.recent_data.open_prices[i]) }}
+                            {% endif %}
+                            {% else %}-{% endif %}
                         </td>
                         <td class="num">
-                            ${{ "%.2f"|format(initial_data.recent_data.low_prices[i]) if initial_data.recent_data.low_prices else "-" }}
+                            {% if initial_data.recent_data.high_prices %}
+                            {% if initial_data.is_vn %}
+                            {{ "{:,.0f}".format(initial_data.recent_data.high_prices[i]) }}
+                            {% else %}
+                            ${{ "%.2f"|format(initial_data.recent_data.high_prices[i]) }}
+                            {% endif %}
+                            {% else %}-{% endif %}
+                        </td>
+                        <td class="num">
+                            {% if initial_data.recent_data.low_prices %}
+                            {% if initial_data.is_vn %}
+                            {{ "{:,.0f}".format(initial_data.recent_data.low_prices[i]) }}
+                            {% else %}
+                            ${{ "%.2f"|format(initial_data.recent_data.low_prices[i]) }}
+                            {% endif %}
+                            {% else %}-{% endif %}
                         </td>
                     </tr>
                     {% endfor %}
@@ -178,10 +282,13 @@
     // Dữ liệu khởi tạo từ Controller
     const initialConfig = {
         symbol: "{{ initial_data.symbol }}",
-        dates: {{ initial_data.recent_data.dates | tojson if initial_data.recent_data else [] }},
-        closes: {{ initial_data.recent_data.close_prices | tojson if initial_data.recent_data else [] }},
-        predictions: {{ initial_data.predictions | tojson if initial_data.predictions else [] }}
+        source: "{{ initial_data.source }}",
+        is_vn: {{ 'true' if initial_data.is_vn else 'false' }},
+        currency: "{{ initial_data.currency }}",
+        dates: {{ (initial_data.recent_data.dates | tojson) if initial_data.recent_data else '[]' }},
+        closes: {{ (initial_data.recent_data.close_prices | tojson) if initial_data.recent_data else '[]' }},
+        predictions: {{ (initial_data.predictions | tojson) if initial_data.predictions else '[]' }}
     };
 </script>
-<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script src="{{ url_for('static', filename='js/main.js') }}?v=2.1"></script>
 {% endblock %}

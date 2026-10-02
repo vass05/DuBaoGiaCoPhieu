@@ -19,18 +19,20 @@ if hasattr(sys.stdout, 'reconfigure'):
         pass
 
 
-# Danh mục các công ty tiêu biểu kèm tên hiển thị trực quan
+# Danh mục các công ty tiêu biểu chọn lọc (Các tập đoàn lớn & 3 mã tiêu biểu Việt Nam)
 POPULAR_STOCKS = [
-    {"symbol": "AAPL", "name": "Apple Inc.", "is_trained": True},
-    {"symbol": "MSFT", "name": "Microsoft Corporation", "is_trained": False},
-    {"symbol": "GOOGL", "name": "Alphabet Inc. (Google)", "is_trained": False},
-    {"symbol": "AMZN", "name": "Amazon.com Inc.", "is_trained": False},
-    {"symbol": "FB", "name": "Meta Platforms (Facebook)", "is_trained": False},
-    {"symbol": "NVDA", "name": "NVIDIA Corporation", "is_trained": False},
-    {"symbol": "IBM", "name": "IBM Corporation", "is_trained": False},
-    {"symbol": "INTC", "name": "Intel Corporation", "is_trained": False},
-    {"symbol": "JPM", "name": "JPMorgan Chase & Co.", "is_trained": False},
-    {"symbol": "AAL", "name": "American Airlines Group", "is_trained": False},
+    # Các công ty công nghệ lớn toàn cầu (USD)
+    {"symbol": "AAPL", "name": "Apple Inc. (Mỹ)", "currency": "USD", "is_trained": True},
+    {"symbol": "NVDA", "name": "NVIDIA Corporation (Mỹ)", "currency": "USD", "is_trained": False},
+    {"symbol": "TSLA", "name": "Tesla Inc. (Mỹ)", "currency": "USD", "is_trained": False},
+    {"symbol": "MSFT", "name": "Microsoft Corporation (Mỹ)", "currency": "USD", "is_trained": False},
+    {"symbol": "GOOGL", "name": "Alphabet Inc. - Google (Mỹ)", "currency": "USD", "is_trained": False},
+    {"symbol": "AMZN", "name": "Amazon.com Inc. (Mỹ)", "currency": "USD", "is_trained": False},
+
+    # Chứng khoán Việt Nam (VND)
+    {"symbol": "FPT.VN", "name": "Tập đoàn FPT (Việt Nam)", "currency": "VND", "is_trained": False},
+    {"symbol": "VIC.VN", "name": "Tập đoàn Vingroup (Việt Nam)", "currency": "VND", "is_trained": False},
+    {"symbol": "VNM.VN", "name": "Vinamilk (Việt Nam)", "currency": "VND", "is_trained": False},
 ]
 
 
@@ -40,6 +42,7 @@ class StockDataLoader:
     _instance = None
     _df_cache = None
     _grouped_cache = {}
+    _realtime_cache = {}
 
     @classmethod
     def get_instance(cls):
@@ -85,8 +88,14 @@ class StockDataLoader:
         return sub_df
 
     def get_last_n_days(self, symbol="AAPL", n=60):
-        """Trích xuất n phiên giao dịch gần nhất của mã cổ phiếu."""
-        sub_df = self.get_stock_data(symbol)
+        """Trích xuất n phiên giao dịch gần nhất của mã cổ phiếu từ tập dữ liệu tĩnh CSV."""
+        lookup_symbol = symbol.strip().upper()
+        self._get_dataframe()
+        # Xử lý trường hợp mã Meta Platforms trong dữ liệu 2018 là FB
+        if lookup_symbol == 'META' and 'META' not in StockDataLoader._grouped_cache and 'FB' in StockDataLoader._grouped_cache:
+            lookup_symbol = 'FB'
+
+        sub_df = self.get_stock_data(lookup_symbol)
         recent = sub_df.tail(n)
 
         dates = recent['date'].dt.strftime('%Y-%m-%d').tolist()
@@ -97,7 +106,8 @@ class StockDataLoader:
         volumes = recent['volume'].tolist() if 'volume' in recent.columns else []
 
         return {
-            "symbol": symbol,
+            "symbol": symbol.strip().upper(),
+            "source": "offline",
             "count": len(closes),
             "dates": dates,
             "close_prices": closes,
@@ -108,6 +118,65 @@ class StockDataLoader:
             "latest_price": closes[-1] if closes else 0,
             "latest_date": dates[-1] if dates else ""
         }
+
+    def get_realtime_stock_data(self, symbol="AAPL", n=60):
+        """
+        Lấy n phiên giao dịch thời gian thực gần nhất qua thư viện Yahoo Finance (yfinance).
+        Có cơ chế bộ nhớ đệm (Cache 5 phút) để tối ưu hiệu năng và tránh gửi request quá tải.
+        """
+        import time
+        import yfinance as yf
+
+        symbol = symbol.strip().upper()
+        # Chuyển đổi mã FB cũ thành mã META hiện tại nếu cần
+        if symbol == 'FB':
+            symbol = 'META'
+
+        now = time.time()
+        cached = StockDataLoader._realtime_cache.get(symbol)
+        if cached and (now - cached['time'] < 300) and cached.get('data', {}).get('count', 0) >= n:
+            return cached['data']
+
+        try:
+            ticker = yf.Ticker(symbol)
+            # period='1y' đảm bảo lấy đủ ~250 phiên giao dịch
+            hist = ticker.history(period='1y')
+        except Exception as e:
+            raise ValueError(f"Không thể kết nối Yahoo Finance để lấy mã '{symbol}': {str(e)}")
+
+        if hist is None or hist.empty or len(hist) < n:
+            raise ValueError(
+                f"Không đủ dữ liệu cho mã '{symbol}' (tìm thấy {len(hist) if hist is not None else 0} phiên, cần tối thiểu {n} phiên). "
+                f"Vui lòng kiểm tra lại mã cổ phiếu."
+            )
+
+        recent = hist.tail(n)
+        dates = recent.index.strftime('%Y-%m-%d').tolist()
+        closes = recent['Close'].round(2).tolist()
+        opens = recent['Open'].round(2).tolist() if 'Open' in recent.columns else []
+        highs = recent['High'].round(2).tolist() if 'High' in recent.columns else []
+        lows = recent['Low'].round(2).tolist() if 'Low' in recent.columns else []
+        volumes = recent['Volume'].astype(int).tolist() if 'Volume' in recent.columns else []
+
+        data_result = {
+            "symbol": symbol,
+            "source": "realtime",
+            "count": len(closes),
+            "dates": dates,
+            "close_prices": closes,
+            "open_prices": opens,
+            "high_prices": highs,
+            "low_prices": lows,
+            "volumes": volumes,
+            "latest_price": closes[-1] if closes else 0,
+            "latest_date": dates[-1] if dates else ""
+        }
+
+        StockDataLoader._realtime_cache[symbol] = {
+            'time': now,
+            'data': data_result
+        }
+        return data_result
 
     def parse_custom_text(self, text):
         """

@@ -60,15 +60,19 @@ RNN/
 ## Các Chức Năng Chính
 
 ### 1. Dự Báo Thị Trường (Bảng Điều Khiển Chính)
-- **Lựa chọn mã cổ phiếu**: Hỗ trợ xem các mã cổ phiếu phổ biến (`AAPL`, `MSFT`, `GOOGL`, `AMZN`, `FB`, `NVDA`, `IBM`, `INTC`, `JPM`, `AAL`,...).
+- **Hỗ trợ 2 nguồn dữ liệu linh hoạt**:
+  - ⚡ **Thời gian thực (Real-time Live)**: Tích hợp trực tiếp với **Yahoo Finance**, tự động tải 60 phiên giao dịch mới nhất tính đến thời điểm hiện tại của thị trường chứng khoán Mỹ.
+  - 📂 **Dữ liệu mẫu lịch sử (Offline CSV)**: Dữ liệu 5 năm (2013 - 2018) từ tập tin cục bộ.
+- **Tra cứu mã cổ phiếu không giới hạn**: Hỗ trợ xem các mã nổi bật (`AAPL`, `MSFT`, `NVDA`, `TSLA`, `GOOGL`, `AMZN`, `META`, `IBM`, `INTC`, `JPM`) hoặc gõ trực tiếp bất kỳ mã cổ phiếu nào theo nhu cầu.
 - **Độ dài dự báo linh hoạt**: Chọn dự báo 1 ngày tới ($T+1$), 3 ngày, 7 ngày (1 tuần), 14 ngày (2 tuần) hoặc 30 ngày (1 tháng).
 - **Thẻ chỉ số thông minh**: Cập nhật giá đóng cửa gần nhất, giá dự báo phiên tiếp theo, mức chênh lệch USD, tỷ lệ biến động (%) và xu hướng dự kiến (*Tăng / Giảm*).
+- **Cơ chế Dynamic Scaling**: Tự động chuẩn hóa dải giá thời gian thực về không gian thích ứng phù hợp cho mạng nơ-ron RNN suy luận mượt mà.
 - **Biểu đồ trực quan**: Vẽ kết hợp giữa 60 phiên thực tế trong quá khứ (đường nét liền) và chuỗi dự báo tương lai (đường nét đứt).
 - **Bảng thống kê chi tiết**: Liệt kê số liệu từng phiên giao dịch trong tương lai và 10 phiên giao dịch gần nhất.
 
 ### 2. Dự Báo Với Dữ Liệu Tùy Biến
 - **Nhập chuỗi giá trực tiếp**: Cho phép người dùng nhập hoặc dán dãy tối thiểu 60 mức giá bất kỳ để mô hình phân tích xu hướng.
-- **Nút điền mẫu tiện lợi**: Bấm 1-click để tự động nạp 60 giá thực tế mẫu để thử nghiệm nhanh chóng.
+- **Nút điền mẫu tiện lợi**: Bấm 1-click để tự động nạp 60 giá thực tế mới nhất để thử nghiệm nhanh chóng.
 - **Tải lên tệp tin CSV**: Kéo thả hoặc tải lên tệp tin `.csv` chứa lịch sử giá để tự động trích xuất cột giá đóng cửa và suy luận kết quả.
 
 ---
@@ -76,14 +80,14 @@ RNN/
 ## Thiết Kế & Trải Nghiệm Giao Diện (UI/UX)
 
 - **Phong cách tối giản, tinh tế (Clean & Minimalist)**: Bố cục rõ ràng, sử dụng bảng màu sắc trung tính dịu mắt (`Slate #0f172a`, `Background #f8fafc`, `Card #ffffff`), độ tương phản chuẩn mực, không gây mỏi mắt.
-- **Không icon màu mè**: Thay thế các biểu tượng rườm rà bằng các nhãn văn bản mạch lạc, thẻ trạng thái đơn sắc trang nhã (*Xanh rừng thẫm* cho xu hướng Tăng, *Đỏ đô dịu* cho xu hướng Giảm).
+- **Không icon màu mè**: Thay thế các biểu tượng rườm rà bằng các nhãn văn bản mạch lạc, thẻ trạng thái đơn sắc trang nhã (*Xanh rừng thẫm* cho xu hướng Tăng, *Đỏ đô dịu* cho xu hướng Giảm, huy hiệu trực tuyến màu lục dịu).
 - **Tương tác mượt mà**: Tích hợp Fetch API và Chart.js để cập nhật biểu đồ và bảng dữ liệu nhanh chóng mà không cần tải lại toàn bộ trang web.
 
 ---
 
 ## Công Nghệ Sử Dụng
 
-- **Backend**: Python 3, Flask (Mô hình MVC), Gunicorn (WSGI Server cho Production).
+- **Backend**: Python 3, Flask (Mô hình MVC), Gunicorn (WSGI Server cho Production), YFinance (Yahoo Finance API).
 - **Machine Learning / AI**: TensorFlow 2.x, Keras (Stacked SimpleRNN 64-32 units), Scikit-learn (MinMaxScaler), NumPy, Pandas, Joblib.
 - **Frontend**: HTML5, Vanilla CSS3 (Custom Design System), JavaScript (ES6+), Chart.js (v4.4).
 - **Deployment & Cloud**: Render.com (Web Service), Git / GitHub.
